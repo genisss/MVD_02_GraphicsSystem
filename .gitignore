@@ -4,8 +4,7 @@
 ## Get latest from https://github.com/github/gitignore/blob/master/VisualStudio.gitignore
 
 
-#allow all files in assets directory
-!/data/assets/*
+
 
 # User-specific files
 *.rsuser
@@ -338,3 +337,6 @@ ASALocalRun/
 
 # Local History for Visual Studio
 .localhistory/
+
+#allow all files in assets directory
+!/data/assets/*
