@@ -16,12 +16,6 @@ void GraphicsSystem::init() {
 	//set 'background' colour of framebuffer
 	glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
 
-	//temporary code to create a camera
-	main_camera_ = new Camera();
-	main_camera_->lookAt(vec3(0.0f, 0.0f, 3.0f), vec3(0.0f, 0.0f, 0.0f), vec3(0.0f, 1.0f, 0.0f));
-	main_camera_->setPerspective(60.0f*DEG2RAD, 1, 0.01f, 100.0f);
-
-
 }
 
 void GraphicsSystem::update(float dt) {
@@ -53,10 +47,20 @@ void GraphicsSystem::renderMeshComponent_(Mesh& comp) {
 	// - modify this function so it renders the geometry and the material associated with the component
 
 
+	lm::vec3 cam_position(0.0f, 0.0f, 3.0f);
+	lm::vec3 cam_target(0.0f, 0.0f, 0.0f);
+	lm::vec3 cam_up(0.0f, 1.0f, 0.0f);
+	lm::mat4 view_matrix, projection_matrix, view_projection;
+	view_matrix.lookAt(cam_position, cam_target, cam_up);
+	projection_matrix.perspective(60.0f*DEG2RAD, 1, 0.01f, 100.0f);
+	view_projection = projection_matrix * view_matrix;
 
+
+	//get transform of components entity
+	Transform& transform = ECS.getComponentFromEntity<Transform>(comp.owner);
 
 	//model matrix
-	lm::mat4 model_matrix;
+	lm::mat4 model_matrix = transform.getGlobalMatrix(ECS.getAllComponents<Transform>());
 
 	//normal matrix
 	lm::mat4 normal_matrix = model_matrix;
@@ -64,7 +68,7 @@ void GraphicsSystem::renderMeshComponent_(Mesh& comp) {
 	normal_matrix.transpose();
 
 	//Model view projection matrix
-	lm::mat4 mvp_matrix = main_camera_->ViewProjection() * model_matrix;
+	lm::mat4 mvp_matrix = view_projection * model_matrix;
 
 	//ask shader for a reference to the uniforms 
 	GLint u_mvp = glGetUniformLocation(current_program_, "u_mvp");
@@ -80,7 +84,7 @@ void GraphicsSystem::renderMeshComponent_(Mesh& comp) {
 	if (u_model != -1) glUniformMatrix4fv(u_model, 1, GL_FALSE, model_matrix.m);
 	if (u_normal_matrix != -1) glUniformMatrix4fv(u_normal_matrix, 1, GL_FALSE, normal_matrix.m);
 	if (u_light_pos != -1) glUniform3f(u_light_pos, 1000.0f, 0.0f, 1000.0f); //... 3f - is 3 floats
-	if (u_cam_pos != -1) glUniform3fv(u_cam_pos, 1, main_camera_->eye().value_); // ...3fv - is array of 3 floats
+	if (u_cam_pos != -1) glUniform3fv(u_cam_pos, 1, cam_position.value_); // ...3fv - is array of 3 floats
 	if (u_texture_diffuse != -1) glUniform1i(u_texture_diffuse, 0); // ...1i - is integer
 	if (u_glossiness != -1) glUniform1f(u_glossiness, 80.0f); //...1f - for float
 

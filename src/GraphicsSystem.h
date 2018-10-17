@@ -2,7 +2,6 @@
 #include "includes.h"
 #include "Shader.h"
 #include "Components.h"
-#include "Camera.h"
 #include "Texture.h"
 #include <vector>
 #include <unordered_map>
@@ -60,7 +59,6 @@ private:
 
 
 	//rendering
-	Camera* main_camera_;
 	GLuint current_program_;
 	void renderMeshComponent_(Mesh& comp);
 };

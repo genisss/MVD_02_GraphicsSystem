@@ -19,7 +19,6 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\src\Camera.cpp" />
     <ClCompile Include="..\src\Components.h" />
     <ClCompile Include="..\src\Game.cpp" />
     <ClCompile Include="..\src\GraphicsSystem.cpp" />
@@ -29,7 +28,6 @@
     <ClCompile Include="..\src\Texture.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\src\Camera.h" />
     <ClInclude Include="..\src\EntityComponentStore.h" />
     <ClInclude Include="..\src\extern.h" />
     <ClInclude Include="..\src\Game.h" />

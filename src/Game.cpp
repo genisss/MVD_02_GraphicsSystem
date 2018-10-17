@@ -19,14 +19,25 @@ void Game::init() {
 
 	//******** NEW CODE **********//
 
-	//TODO:
-	// - store plane geometry in graphics system
+	//TODO in GraphicsSystem.h and GraphicsSystem.cpp
+	// - fill properties of Material and Geometry structs
+	// - create storage vectors for Materials and Geometries
+	// - create function to create/access/update materials and geometries
+	// - optional: modify createPlaneGeometry so it creates a geometry directly in storage vector
+	// - change render function so it uses geometry and material of component
+	
+	//TODO in Component.h
+	// - modify Mesh Component to store
+	//		- index of geometry (in graphics system storage array)
+	//		- index of material (in graphics system storage array)
+
+	//TODO here in Game.cpp
+	// - Create plane geometry and store in graphics system
 	// - create material and store it in graphics system
-	//    - texture id
-	//    - shader id
-	//    - all other properties
-	// - change mesh component to store ids of geometry and material (in graphics system storage)
-	// - change graphics system component render to use geometry and material of component
+	// - Create Entity for plane (as code above)
+	// - Create Mesh Component for plane (modified from code above) to set material and geometry correctly
+	
+	//TODO: Advanced
 	// - add a function to GraphicsSystem to parse an OBJ file and store it's geometry
 
 }

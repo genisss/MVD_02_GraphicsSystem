@@ -24,9 +24,15 @@ struct Component {
 
 // Transform Component
 // - inherits a mat4 which represents a model matrix
-// - parent: a Transform which represents this component's parent
+// - parent: id of Transform which represents this component's parent
 struct Transform : public Component, public lm::mat4 {
-    Transform* parent;
+	int parent = -1;
+	lm::mat4 getGlobalMatrix(std::vector<Transform>& transforms) {
+		if (parent != -1) {
+			return transforms.at(parent).getGlobalMatrix(transforms) * *this;
+		}
+		else return *this;
+	}
 };
 
 // Mesh Component
