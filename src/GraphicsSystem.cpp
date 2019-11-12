@@ -1,3 +1,6 @@
+#include <iostream>
+#include <sstream>
+#include <fstream>
 #include "GraphicsSystem.h"
 #include "Game.h"
 #include "extern.h"
@@ -19,20 +22,23 @@ void GraphicsSystem::init() {
 }
 
 void GraphicsSystem::update(float dt) {
-	
+
 	//set initial OpenGL state
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	//TODO: remove this line!
-	current_program_ = shaders_["phong"]->program; 
+	current_program_ = shaders_["phong"]->program;
 
 	//get reference to mesh components first
 	auto& mesh_components = ECS.getAllComponents<Mesh>();
 
 	//loop over mesh components by reference (&)
-	for (auto &curr_comp : mesh_components) {
-		// TODO:
-		// - change shader if material of component is different
+	for (auto& curr_comp : mesh_components) {
+		//Get shader frot his material
+		Material& comp_mat = getMaterial(curr_comp.material);
+		current_program_ = comp_mat.shader_id;
+
+		//activate shader
 		glUseProgram(current_program_);
 
 		//render component
@@ -45,14 +51,15 @@ void GraphicsSystem::renderMeshComponent_(Mesh& comp) {
 
 	//TODO:
 	// - modify this function so it renders the geometry and the material associated with the component
+	Geometry& comp_geom = getGeometry(comp.geometry);
+	Material& comp_mat = getMaterial(comp.material);
 
-
-	lm::vec3 cam_position(0.0f, 0.0f, 3.0f);
+	lm::vec3 cam_position(3.0f, -3.0f, 3.0f);
 	lm::vec3 cam_target(0.0f, 0.0f, 0.0f);
 	lm::vec3 cam_up(0.0f, 1.0f, 0.0f);
 	lm::mat4 view_matrix, projection_matrix, view_projection;
 	view_matrix.lookAt(cam_position, cam_target, cam_up);
-	projection_matrix.perspective(60.0f*DEG2RAD, 1, 0.01f, 100.0f);
+	projection_matrix.perspective(60.0f * DEG2RAD, 1, 0.01f, 100.0f);
 	view_projection = projection_matrix * view_matrix;
 
 
@@ -78,6 +85,7 @@ void GraphicsSystem::renderMeshComponent_(Mesh& comp) {
 	GLint u_cam_pos = glGetUniformLocation(current_program_, "u_cam_pos");
 	GLint u_texture_diffuse = glGetUniformLocation(current_program_, "u_texture_diffuse");
 	GLint u_glossiness = glGetUniformLocation(current_program_, "u_glossiness");
+	GLint u_diffuse = glGetUniformLocation(current_program_, "u_diffuse");
 
 	//if the uniforms exist, send the data to the shader
 	if (u_mvp != -1) glUniformMatrix4fv(u_mvp, 1, GL_FALSE, mvp_matrix.m);
@@ -87,16 +95,17 @@ void GraphicsSystem::renderMeshComponent_(Mesh& comp) {
 	if (u_cam_pos != -1) glUniform3fv(u_cam_pos, 1, cam_position.value_); // ...3fv - is array of 3 floats
 	if (u_texture_diffuse != -1) glUniform1i(u_texture_diffuse, 0); // ...1i - is integer
 	if (u_glossiness != -1) glUniform1f(u_glossiness, 80.0f); //...1f - for float
+	if (u_diffuse != -1) glUniform3fv(u_diffuse, 1, comp_mat.diffuse_color.value_); // ...3fv - is array of 3 floats
 
 															  //activate texture unit 0, and bind our texture there
 	glActiveTexture(GL_TEXTURE0);
-	glBindTexture(GL_TEXTURE_2D, temp_texture);
+	glBindTexture(GL_TEXTURE_2D, comp_mat.diffuse_texture);
 
 	//tell OpenGL we want to the the vao_ container with our buffers
-	glBindVertexArray(comp.vao);
+	glBindVertexArray(comp_geom.vao);
 
 	//draw our geometry
-	glDrawElements(GL_TRIANGLES, comp.num_tris * 3, GL_UNSIGNED_INT, 0);
+	glDrawElements(GL_TRIANGLES, comp_geom.num_tris * 3, GL_UNSIGNED_INT, 0);
 
 	//tell OpenGL we don't want to use our container anymore
 	glBindVertexArray(0);
@@ -128,11 +137,11 @@ GLuint GraphicsSystem::loadTexture(std::string path) {
 }
 
 //creates a standard plane geometry
-void GraphicsSystem::createPlaneGeometry(GLuint& vao, GLuint& num_tris) {
+int GraphicsSystem::createPlaneGeometry() {
 
 	//TODO: 
 	// - rewrite this function so that it adds a geometry to teh std::vector
-
+	Geometry new_geom;
 
 
 	//four vertices in a square
@@ -161,11 +170,11 @@ void GraphicsSystem::createPlaneGeometry(GLuint& vao, GLuint& num_tris) {
 	const GLuint index_buffer_data[] = { 0, 1, 2, 0, 2, 3 };
 
 	//set number of triangles (of passed variable)
-	num_tris = 2;
+	new_geom.num_tris = 2;
 
 	//create Vertex Array Object
-	glGenVertexArrays(1, &vao);
-	glBindVertexArray(vao);
+	glGenVertexArrays(1, &new_geom.vao);
+	glBindVertexArray(new_geom.vao);
 
 	//Now create Vertex Buffer Objects for each buffer: positions, uvs, normals, and indices
 	GLuint vbo;
@@ -197,5 +206,148 @@ void GraphicsSystem::createPlaneGeometry(GLuint& vao, GLuint& num_tris) {
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 	glBindVertexArray(0);
 
+	geometries_.push_back(new_geom);
 
+	//we'll return the index of the new geometry in the geometries aarray
+	return (int)geometries_.size() - 1;
 }
+
+int GraphicsSystem::createBaseMaterial() {
+	Material new_mat;
+	materials_.push_back(new_mat);
+	return (int)materials_.size() - 1;
+}
+
+int GraphicsSystem::createGeometryFromOBJ() {
+
+
+	const string path = "data/assets/cube.obj";
+
+	string line;
+	ifstream myfile(path);
+	if (myfile.is_open())
+	{
+		string vertex = "v";
+		string texture = "vt";
+		string normal = "vn";
+		string faces = "f";
+		std::vector <GLfloat> position_buffer_data_vector;
+		std::vector <GLfloat> texture_buffer_data_vector;
+		std::vector <GLfloat> normal_buffer_data_vector;
+		std::vector <GLfloat> texture_buffer_data_provisional;
+		std::vector <GLfloat> normal_buffer_data_provisional;
+		std::vector <GLuint> index_buffer_data_vector;
+		std::map <string, int> index_buffer_data_vector;
+		size_t num_tris = 0;
+
+		size_t num_vertex = 0;
+		while (getline(myfile, line))
+		{
+
+			if (texture.length() <= line.length() && equal(texture.begin(), texture.end(), line.begin())) {
+				std::istringstream iss(line);
+				for (std::string line; iss >> line; ) {
+					if (!line._Equal(texture)) {
+						texture_buffer_data_provisional.push_back(stof(line));
+					}
+				}
+			}
+			else if (normal.length() <= line.length() && equal(normal.begin(), normal.end(), line.begin())) {
+				std::istringstream iss(line);
+				for (std::string line; iss >> line; ) {
+					if (!line._Equal(normal)) {
+						normal_buffer_data_provisional.push_back(stof(line));
+					}
+				}
+			}
+			//if line sarts with 'v' add toto std::vector of lm::vec3
+			else if (vertex.length() <= line.length() && equal(vertex.begin(), vertex.end(), line.begin())) {
+				std::istringstream iss(line);
+				for (std::string line; iss >> line; ) {
+					if (!line._Equal(vertex)) {
+						position_buffer_data_vector.push_back(stof(line));
+					}
+				}
+				num_vertex++;
+
+			}
+			else if (faces.length() <= line.length() && equal(faces.begin(), faces.end(), line.begin())) {
+				num_tris++;
+				std::istringstream iss(line);
+				if (size(texture_buffer_data_vector) == 0) {
+					texture_buffer_data_vector.resize(num_vertex * 2);
+					normal_buffer_data_vector.resize(num_vertex * 3);
+				}
+				for (std::string line; iss >> line; ) {
+					//Crear un nou stdMap<string,int>
+					if (!line._Equal(faces)) {
+						int idx_vert = (atoi(&line[0]) - 1);
+						int idx_tex = (atoi(&line[2]) - 1) * 2;
+						int idx_norm = (atoi(&line[4]) - 1) * 3;
+						index_buffer_data_vector.push_back(idx_vert+1);
+						texture_buffer_data_vector.at(idx_vert * 2) = texture_buffer_data_provisional.at(idx_tex);
+						texture_buffer_data_vector[(idx_vert * 2) + 1] = texture_buffer_data_provisional[idx_tex + 1];
+						normal_buffer_data_vector[idx_vert * 3] = normal_buffer_data_provisional[idx_norm];
+						normal_buffer_data_vector[(idx_vert * 3) + 1] = normal_buffer_data_provisional[idx_norm + 1];
+						normal_buffer_data_vector[(idx_vert * 3) + 2] = normal_buffer_data_provisional[idx_norm + 2];
+					}
+				}
+			}
+
+		}
+
+		myfile.close();
+
+		Geometry new_geom;
+
+		//set number of triangles (of passed variable)
+		new_geom.num_tris = num_tris;
+
+		//create Vertex Array Object
+		glGenVertexArrays(1, &new_geom.vao);
+		glBindVertexArray(new_geom.vao);
+
+		//Now create Vertex Buffer Objects for each buffer: positions, uvs, normals, and indices
+		GLuint vbo;
+		//positions
+		glGenBuffers(1, &vbo); //create buffer
+		glBindBuffer(GL_ARRAY_BUFFER, vbo); //set OpenGL state to say we want to work with this buffer
+		glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * position_buffer_data_vector.size(), &position_buffer_data_vector[0], GL_STATIC_DRAW); //copy data
+		glEnableVertexAttribArray(0); //enable attribute labelled as '0' in vertex shader: "layout(location = 0) in vec3 a_vertex;"
+		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0); //each attribute '0' is composed of 3 floats (in this case, xyz)
+
+		//texture coords
+		glGenBuffers(1, &vbo);
+		glBindBuffer(GL_ARRAY_BUFFER, vbo);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * texture_buffer_data_vector.size(), &texture_buffer_data_vector[0], GL_STATIC_DRAW);
+		glEnableVertexAttribArray(1); // (1 = a_uv)
+		glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, 0); //only two coordinates for textures: uv
+		//normals								   
+		glGenBuffers(1, &vbo);
+		glBindBuffer(GL_ARRAY_BUFFER, vbo);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * normal_buffer_data_vector.size(), &normal_buffer_data_vector[0], GL_STATIC_DRAW);
+		glEnableVertexAttribArray(2); // (2 = a_normal)
+		glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 0, 0);
+		//indices
+		GLuint ibo;
+		glGenBuffers(1, &ibo);
+		glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
+		glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(GLuint) * index_buffer_data_vector.size(), &index_buffer_data_vector[0], GL_STATIC_DRAW);
+		//unbind
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+		glBindVertexArray(0);
+
+		geometries_.push_back(new_geom);
+
+		//we'll return the index of the new geometry in the geometries aarray
+		return (int)geometries_.size() - 1;
+
+
+
+	}
+
+	else cout << "Unable to open file";
+
+	return 0;
+}
+

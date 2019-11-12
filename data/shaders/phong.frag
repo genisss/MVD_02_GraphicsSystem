@@ -7,6 +7,7 @@ in vec3 v_cam_dir;
 
 out vec4 fragColor;
 
+uniform vec3 u_diffuse;
 uniform sampler2D u_texture_diffuse;
 uniform float u_glossiness;
 
@@ -24,7 +25,7 @@ void main(){
 
 	//diffuse color
 	float NdotL = max(0.0, dot(N, L));
-	vec3 diffuse_color = NdotL * texture(u_texture_diffuse, v_uv).xyz;
+	vec3 diffuse_color = NdotL * texture(u_texture_diffuse, v_uv).xyz * u_diffuse;
 
 	//specular color
 	float RdotV = max(0.0, dot(R, V)); //calculate dot product

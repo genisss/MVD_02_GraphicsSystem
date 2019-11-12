@@ -43,8 +43,8 @@ struct Mesh : public Component {
 	// - change the mesh component so that it references 
 	//   a material as well as a geometry
 	
-	GLuint vao;
-	GLuint num_tris;
+	int geometry;
+	int material;
 };
 
 /**** COMPONENT STORAGE ****/

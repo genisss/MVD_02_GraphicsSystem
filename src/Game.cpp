@@ -11,12 +11,18 @@ void Game::init() {
 
 	//load a shader
 	graphics_system_.loadShader("phong", "data/shaders/phong.vert", "data/shaders/phong.frag");
-	graphics_system_.temp_texture = graphics_system_.loadTexture("data/assets/test.tga");
+
 
 	int ent_plane = ECS.createEntity("plane");
 	Mesh& pmc = ECS.createComponentForEntity<Mesh>(ent_plane);
-	graphics_system_.createPlaneGeometry(pmc.vao, pmc.num_tris);	
+	
+	//create plane geomtery and return the index in the geometries array
+	pmc.geometry = graphics_system_.createGeometryFromOBJ();
+	pmc.material = graphics_system_.createBaseMaterial();
+	Material& pmc_mat = graphics_system_.getMaterial(pmc.material);
+	pmc_mat.diffuse_texture = graphics_system_.loadTexture("data/assets/test.tga");
 
+	pmc_mat.shader_id = graphics_system_.getShaderProgram("phong");
 	//******** NEW CODE **********//
 
 	//TODO in GraphicsSystem.h and GraphicsSystem.cpp
@@ -40,6 +46,9 @@ void Game::init() {
 	//TODO: Advanced
 	// - add a function to GraphicsSystem to parse an OBJ file and store it's geometry
 
+
+
+	
 }
 
 //Entry point for game update code
